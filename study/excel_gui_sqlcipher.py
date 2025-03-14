@@ -6,7 +6,7 @@ import os
 import subprocess
 
 # 암호 설정 (사용자가 직접 설정 가능)
-DB_PASSWORD = "your_secure_password"
+DB_PASSWORD = "nadia"
 
 def create_database():
     if not os.path.exists('internal_data_encrypted.db'):
