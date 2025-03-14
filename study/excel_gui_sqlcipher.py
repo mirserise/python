@@ -4,12 +4,27 @@ import pandas as pd
 import sqlite3
 import os
 import subprocess
+import platform
 
 # 암호 설정 (사용자가 직접 설정 가능)
 DB_PASSWORD = "nadia"
+DB_FILE = 'internal_data_encrypted.db'
+
+def hide_file():
+    try:
+        if platform.system() == "Windows":
+            # Windows: 숨김 속성 추가
+            subprocess.run(['attrib', '+h', DB_FILE], shell=True, check=True)
+        elif platform.system() == "Darwin":  # MacOS의 경우
+            # MacOS: 숨김 속성 추가
+            subprocess.run(['chflags', 'hidden', DB_FILE], check=True)
+        else:
+            print("이 운영체제에서는 숨김 처리가 지원되지 않습니다.")
+    except Exception as e:
+        print(f"파일 숨김 처리 중 오류 발생: {e}")
 
 def create_database():
-    if not os.path.exists('internal_data_encrypted.db'):
+    if not os.path.exists(DB_FILE):
         file_a = filedialog.askopenfilename(title="자체 데이터 선택", filetypes=[("Excel files", "*.xlsx *.xls")])
         if not file_a:
             return
@@ -18,12 +33,12 @@ def create_database():
             df_a = pd.read_excel(file_a)
 
             # 기존 파일 삭제 후 새로 생성
-            if os.path.exists('internal_data_encrypted.db'):
-                os.remove('internal_data_encrypted.db')
+            if os.path.exists(DB_FILE):
+                os.remove(DB_FILE)
 
             # sqlcipher 명령어로 암호화된 DB 생성
             command = f"""
-            sqlcipher internal_data_encrypted.db <<EOF
+            sqlcipher {DB_FILE} <<EOF
             PRAGMA key = '{DB_PASSWORD}';
             CREATE TABLE IF NOT EXISTS data (
                 성명 TEXT,
@@ -31,18 +46,20 @@ def create_database():
                 구분 TEXT,
                 아이디 TEXT
             );
-            .quit
             EOF
             """
             subprocess.run(command, shell=True, check=True)
 
             # SQLite 연결 후 데이터 저장 (암호화 상태)
-            conn = sqlite3.connect('internal_data_encrypted.db')
+            conn = sqlite3.connect(DB_FILE)
             conn.execute(f"PRAGMA key = '{DB_PASSWORD}';")
 
             # 데이터 삽입
             df_a.to_sql("data", conn, if_exists="replace", index=False)
             conn.close()
+
+            # ✅ DB 파일 숨기기 추가
+            hide_file()
 
             messagebox.showinfo("완료", "데이터베이스에 암호화된 데이터를 저장했습니다.")
         except Exception as e:
@@ -59,7 +76,7 @@ def process_files():
         df_b = pd.read_excel(file_b, usecols="A:C", names=["성명", "기관명", "구분"])
 
         # 암호화된 DB 열기
-        conn = sqlite3.connect('internal_data_encrypted.db')
+        conn = sqlite3.connect(DB_FILE)
         conn.execute(f"PRAGMA key = '{DB_PASSWORD}';")
 
         query = "SELECT 성명, 기관명, 구분, 아이디 FROM data"
